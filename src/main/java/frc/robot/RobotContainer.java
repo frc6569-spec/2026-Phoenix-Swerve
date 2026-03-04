@@ -16,7 +16,7 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
-
+import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.Feeder;
@@ -24,6 +24,7 @@ import frc.robot.subsystems.Intake;
 import frc.robot.subsystems.Shooter;
 import frc.robot.subsystems.Slide;
 import frc.robot.subsystems.Climber;
+import frc.robot.commands.ShootCommand;
 
 public class RobotContainer {
     //Subsystems
@@ -34,8 +35,6 @@ public class RobotContainer {
     private final Climber climber = new Climber();
 
     
-
-
     private double MaxSpeed = 1.0 * TunerConstants.kSpeedAt12Volts.in(MetersPerSecond); // kSpeedAt12Volts desired top speed
     private double MaxAngularRate = RotationsPerSecond.of(0.75).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
 
@@ -48,8 +47,8 @@ public class RobotContainer {
 
     private final Telemetry logger = new Telemetry(MaxSpeed);
 
-    private final CommandXboxController joystick = new CommandXboxController(0);
-    private final CommandXboxController operator = new CommandXboxController(1);    
+    private final CommandXboxController driverXboxController = new CommandXboxController(0);
+    private final CommandXboxController operatorXboxController = new CommandXboxController(1);    
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
 
@@ -61,9 +60,9 @@ public class RobotContainer {
     drivetrain.setDefaultCommand(
         drivetrain.applyRequest(() -> {
             // 1. Get raw inputs
-            double rawY = -joystick.getLeftY();
-            double rawX = -joystick.getLeftX();
-            double rawRot = -joystick.getRightX();
+            double rawY = -driverXboxController.getLeftY();
+            double rawX = -driverXboxController.getLeftX();
+            double rawRot = -driverXboxController.getRightX();
 
             // 2. Square the inputs (Controller Squaring)
             // This creates the "slow zone" in the middle of the stick
@@ -73,7 +72,7 @@ public class RobotContainer {
 
             // 3. Dynamic Speed Multiplier (Slow Mode)
             // If Right Trigger is held, go 50% speed. Otherwise, 100%.
-            double speedMultiplier = joystick.getRightTriggerAxis() > 0.5 ? 0.5 : 1.0;
+            double speedMultiplier = driverXboxController.getRightTriggerAxis() > 0.5 ? 0.5 : 1.0;
 
             return drive
                 .withVelocityX(squaredY * MaxSpeed * speedMultiplier)
@@ -90,23 +89,49 @@ public class RobotContainer {
         drivetrain.applyRequest(() -> idle).ignoringDisable(true)
     );
 
-    joystick.a().whileTrue(drivetrain.applyRequest(() -> brake));
-    joystick.b().whileTrue(drivetrain.applyRequest(() -> point.withModuleDirection(new Rotation2d(-joystick.getLeftY(), -joystick.getLeftX()))));
+    driverXboxController.a().whileTrue(drivetrain.applyRequest(() -> brake));
+    driverXboxController.b().whileTrue(drivetrain.applyRequest(() -> point.withModuleDirection(new Rotation2d(-driverXboxController.getLeftY(), -driverXboxController.getLeftX()))));
 
     // SysId routines
-    joystick.back().and(joystick.y()).whileTrue(drivetrain.sysIdDynamic(Direction.kForward));
-    joystick.back().and(joystick.x()).whileTrue(drivetrain.sysIdDynamic(Direction.kReverse));
-    joystick.start().and(joystick.y()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kForward));
-    joystick.start().and(joystick.x()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kReverse));
+    driverXboxController.back().and(driverXboxController.y()).whileTrue(drivetrain.sysIdDynamic(Direction.kForward));
+    driverXboxController.back().and(driverXboxController.x()).whileTrue(drivetrain.sysIdDynamic(Direction.kReverse));
+    driverXboxController.start().and(driverXboxController.y()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kForward));
+    driverXboxController.start().and(driverXboxController.x()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kReverse));
 
-    // Reset heading
-    joystick.leftBumper().onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
-    
+    // Reset heading (with start and back button)
+    driverXboxController.back().and(driverXboxController.start())
+        .onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
+
     drivetrain.registerTelemetry(logger::telemeterize);
+    
+    // Shooter controls
+    driverXboxController.rightTrigger(.5)
+        .whileTrue(new ShootCommand(shooter, feeder));
 
+    // ----------------------------
+    // Intake Controls
+    // ----------------------------
+    // Extend intake and start rollers automatically
+    operatorXboxController.rightBumper()
+        .onTrue(
+            intake.runOnce(intake::extendIntake)
+                .andThen(new WaitUntilCommand(intake::isExtended))
+                .andThen(intake.runOnce(intake::runIntake))
+        );
+
+    // Retract intake and stop rollers
+    operatorXboxController.leftBumper()
+        .onTrue(
+            intake.runOnce(intake::stopIntake)
+                .andThen(intake.runOnce(intake::retractIntake))
+        );
+
+    // ----------------------------    
     // Operator controls
-    operator.a().onTrue(slide.runOnce(slide::extend));
-    operator.b().onTrue(slide.runOnce(slide::retract));
+    // ----------------------------
+    // Extend Slide
+    operatorXboxController.a().onTrue(slide.runOnce(slide::extend));
+    operatorXboxController.b().onTrue(slide.runOnce(slide::retract));
     }
 
 
