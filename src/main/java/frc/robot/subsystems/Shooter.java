@@ -51,5 +51,7 @@ public class Shooter extends SubsystemBase {
     SmartDashboard.putNumber("Shooter Speed", currentSpeed);
     SmartDashboard.putBoolean("Shooter At Speed", atSpeed());
     SmartDashboard.putNumber("Shooter Target Speed", SHOOT_SPEED);
+    SmartDashboard.putNumber("Shooter Output", shooterLeader.get());
+    
     }
 }

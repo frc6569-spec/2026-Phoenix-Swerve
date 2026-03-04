@@ -1,5 +1,6 @@
 package frc.robot.subsystems;
 
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
 import com.ctre.phoenix6.hardware.TalonFX;
@@ -32,5 +33,11 @@ public class Feeder extends SubsystemBase {
 
     public void stopFeeder() {
         feederMotor.setControl(feederRequest.withOutput(0.0));
+    }
+
+    @Override
+    public void periodic() {
+
+        SmartDashboard.putNumber("Feeder Output", feederMotor.get());
     }
 }

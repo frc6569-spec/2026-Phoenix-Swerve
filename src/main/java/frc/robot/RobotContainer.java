@@ -10,6 +10,7 @@ import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -17,6 +18,7 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.Feeder;
@@ -33,7 +35,7 @@ public class RobotContainer {
     private final Feeder feeder = new Feeder();
     private final Slide slide = new Slide();
     private final Climber climber = new Climber();
-
+    private boolean climbEnabled = false;
     
     private double MaxSpeed = 1.0 * TunerConstants.kSpeedAt12Volts.in(MetersPerSecond); // kSpeedAt12Volts desired top speed
     private double MaxAngularRate = RotationsPerSecond.of(0.75).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
@@ -71,8 +73,8 @@ public class RobotContainer {
             double squaredRot = Math.copySign(rawRot * rawRot, rawRot);
 
             // 3. Dynamic Speed Multiplier (Slow Mode)
-            // If Right Trigger is held, go 50% speed. Otherwise, 100%.
-            double speedMultiplier = driverXboxController.getRightTriggerAxis() > 0.5 ? 0.5 : 1.0;
+            // If Left Trigger is held, go 50% speed. Otherwise, 100%.
+            double speedMultiplier = driverXboxController.getLeftTriggerAxis() > 0.5 ? 0.5 : 1.0;
 
             return drive
                 .withVelocityX(squaredY * MaxSpeed * speedMultiplier)
@@ -112,18 +114,22 @@ public class RobotContainer {
     // Intake Controls
     // ----------------------------
     // Extend intake and start rollers automatically
-    operatorXboxController.rightBumper()
+    driverXboxController.rightBumper()
+        .debounce(0.25)    
+        .and(() -> !climbEnabled)
         .onTrue(
             intake.runOnce(intake::extendIntake)
                 .andThen(new WaitUntilCommand(intake::isExtended))
                 .andThen(intake.runOnce(intake::runIntake))
         );
-
     // Retract intake and stop rollers
-    operatorXboxController.leftBumper()
+    driverXboxController.leftBumper()
+        .debounce(0.25)
         .onTrue(
-            intake.runOnce(intake::stopIntake)
-                .andThen(intake.runOnce(intake::retractIntake))
+            intake.runOnce(() -> {
+                intake.stopIntake();
+                intake.retractIntake();
+            })
         );
 
     // ----------------------------    
@@ -132,8 +138,27 @@ public class RobotContainer {
     // Extend Slide
     operatorXboxController.a().onTrue(slide.runOnce(slide::extend));
     operatorXboxController.b().onTrue(slide.runOnce(slide::retract));
+
+    // Enable Climber
+    operatorXboxController.start().onTrue(
+        new InstantCommand(() -> climbEnabled = !climbEnabled)
+    );
+
+    // climb up
+    operatorXboxController.rightTrigger(0.5)
+        .and(() -> climbEnabled)
+        .whileTrue(climber.run(() -> climber.climbUp()));
+
+    // climb down
+    operatorXboxController.leftTrigger(0.5)
+        .and(() -> climbEnabled)
+        .whileTrue(climber.run(() -> climber.climbDown()));
+
     }
 
+    public void periodic() {
+        SmartDashboard.putBoolean("Climb Enabled", climbEnabled);
+    }
 
     public Command getAutonomousCommand() {
         // Simple drive forward auton
@@ -153,4 +178,7 @@ public class RobotContainer {
             drivetrain.applyRequest(() -> idle)
         );
     }
+
+
+
 }
