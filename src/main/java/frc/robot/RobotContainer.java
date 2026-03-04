@@ -15,6 +15,7 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
 
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
@@ -32,6 +33,7 @@ public class RobotContainer {
     private final Slide slide = new Slide();
     private final Climber climber = new Climber();
 
+    
 
 
     private double MaxSpeed = 1.0 * TunerConstants.kSpeedAt12Volts.in(MetersPerSecond); // kSpeedAt12Volts desired top speed
@@ -102,14 +104,9 @@ public class RobotContainer {
     
     drivetrain.registerTelemetry(logger::telemeterize);
 
-    // Operater controls for intake, shooter, feeder, slide, and climber can be added here using operator controller
-    operator.a().onTrue(
-        Commands.runOnce(()-> slide.setPosition(Slide.EXTENDED), slide)
-    );
-    operator.b().onTrue(
-        Commands.runOnce(()-> slide.setPosition(Slide.RETRACTED), slide)
-    );
-
+    // Operator controls
+    operator.a().onTrue(slide.runOnce(slide::extend));
+    operator.b().onTrue(slide.runOnce(slide::retract));
     }
 
 
