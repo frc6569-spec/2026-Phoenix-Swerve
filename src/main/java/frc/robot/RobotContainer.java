@@ -47,6 +47,7 @@ public class RobotContainer {
     private final Telemetry logger = new Telemetry(MaxSpeed);
 
     private final CommandXboxController joystick = new CommandXboxController(0);
+    private final CommandXboxController operator = new CommandXboxController(1);    
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
 
@@ -100,6 +101,15 @@ public class RobotContainer {
     joystick.leftBumper().onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
     
     drivetrain.registerTelemetry(logger::telemeterize);
+
+    // Operater controls for intake, shooter, feeder, slide, and climber can be added here using operator controller
+    operator.a().onTrue(
+        Commands.runOnce(()-> slide.setPosition(Slide.EXTENDED), slide)
+    );
+    operator.b().onTrue(
+        Commands.runOnce(()-> slide.setPosition(Slide.RETRACTED), slide)
+    );
+
     }
 
 
