@@ -7,7 +7,7 @@ import com.ctre.phoenix6.controls.DutyCycleOut;
 
 public class Feeder extends SubsystemBase {
 
-    private final TalonFX feederMotor = new TalonFX(53); // change CAN ID if needed
+    private final TalonFX feederMotor = new TalonFX(56); // change CAN ID if needed
     private final DutyCycleOut feederRequest = new DutyCycleOut(0);
 
     public Feeder() {
