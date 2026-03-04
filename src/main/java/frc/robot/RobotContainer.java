@@ -18,8 +18,22 @@ import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
+import frc.robot.subsystems.Feeder;
+import frc.robot.subsystems.Intake;
+import frc.robot.subsystems.Shooter;
+import frc.robot.subsystems.Slide;
+import frc.robot.subsystems.Climber;
 
 public class RobotContainer {
+    //Subsystems
+    private final Intake intake = new Intake();
+    private final Shooter shooter = new Shooter();
+    private final Feeder feeder = new Feeder();
+    private final Slide slide = new Slide();
+    private final Climber climber = new Climber();
+
+
+
     private double MaxSpeed = 1.0 * TunerConstants.kSpeedAt12Volts.in(MetersPerSecond); // kSpeedAt12Volts desired top speed
     private double MaxAngularRate = RotationsPerSecond.of(0.75).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
 
