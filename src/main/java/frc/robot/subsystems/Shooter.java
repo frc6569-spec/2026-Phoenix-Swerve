@@ -2,22 +2,23 @@ package frc.robot.subsystems;
 
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.Follower;
-
+import com.ctre.phoenix6.signals.MotorAlignmentValue;
 
 public class Shooter extends SubsystemBase {
 
-    private final TalonFX shooterLeader = new TalonFX(57); // change CAN ID
+    private final TalonFX shooterLeader = new TalonFX(57);
     private final TalonFX shooterFollower = new TalonFX(58);
 
     private final VelocityVoltage velocityRequest = new VelocityVoltage(0);
 
-    public static final double SHOOT_SPEED = 60; // rotations per second (example)
+    public static final double SHOOT_SPEED = 60; // rotations per second
 
     public Shooter() {
-            
+
         var config = shooterLeader.getConfigurator();
 
         var slot0Configs = new com.ctre.phoenix6.configs.Slot0Configs();
@@ -26,8 +27,13 @@ public class Shooter extends SubsystemBase {
 
         config.apply(slot0Configs);
 
-        // follower motor mirrors the leader
-        shooterFollower.setControl(new Follower(57, null));
+        // ✅ Proper Phoenix 6 follower setup
+        shooterFollower.setControl(
+            new Follower(
+                shooterLeader.getDeviceID(),
+                MotorAlignmentValue.Aligned
+            )
+        );
     }
 
     public void spinShooter() {
@@ -46,12 +52,11 @@ public class Shooter extends SubsystemBase {
     @Override
     public void periodic() {
 
-    double currentSpeed = shooterLeader.getVelocity().getValueAsDouble();
+        double currentSpeed = shooterLeader.getVelocity().getValueAsDouble();
 
-    SmartDashboard.putNumber("Shooter Speed", currentSpeed);
-    SmartDashboard.putBoolean("Shooter At Speed", atSpeed());
-    SmartDashboard.putNumber("Shooter Target Speed", SHOOT_SPEED);
-    SmartDashboard.putNumber("Shooter Output", shooterLeader.get());
-    
+        SmartDashboard.putNumber("Shooter Speed", currentSpeed);
+        SmartDashboard.putBoolean("Shooter At Speed", atSpeed());
+        SmartDashboard.putNumber("Shooter Target Speed", SHOOT_SPEED);
+        SmartDashboard.putNumber("Shooter Output", shooterLeader.get());
     }
 }

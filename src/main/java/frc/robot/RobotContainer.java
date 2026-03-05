@@ -143,21 +143,39 @@ public class RobotContainer {
     operatorXboxController.start().onTrue(
         new InstantCommand(() -> climbEnabled = !climbEnabled)
     );
-
     // climb up
-    operatorXboxController.rightTrigger(0.5)
-        .and(() -> climbEnabled)
-        .whileTrue(climber.run(() -> climber.climbUp()));
+    operatorXboxController.rightTrigger(0.1)
+    .and(() -> climbEnabled)
+    .whileTrue(
+        climber.runEnd(
+            () -> climber.climbUp(),   // while held
+            () -> climber.stop()       // when released
+        )
+    );
 
     // climb down
-    operatorXboxController.leftTrigger(0.5)
-        .and(() -> climbEnabled)
-        .whileTrue(climber.run(() -> climber.climbDown()));
+    operatorXboxController.leftTrigger(0.1)
+    .and(() -> climbEnabled)
+    .whileTrue(
+        climber.runEnd(
+            () -> climber.climbDown(),
+            () -> climber.stop()
+        )
+    );
 
     }
 
     public void periodic() {
         SmartDashboard.putBoolean("Climb Enabled", climbEnabled);
+        SmartDashboard.putNumber(
+            "Operator RT",
+            operatorXboxController.getRightTriggerAxis()
+        );
+
+        SmartDashboard.putNumber(
+            "Operator LT",
+            operatorXboxController.getLeftTriggerAxis()
+        );
     }
 
     public Command getAutonomousCommand() {

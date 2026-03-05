@@ -16,9 +16,9 @@ public class Climber extends SubsystemBase {
 
     // position limits (example values)
     public static final double REST = 0;
-    public static final double START = 10;
-    public static final double UPPER_LIMIT = 60;
-    public static final double LOWER_LIMIT = 0;
+    public static final double START = 4.5;
+    public static final double UPPER_LIMIT = 4.5;
+    public static final double LOWER_LIMIT = -4.5;
 
     public Climber() {
 
@@ -39,7 +39,7 @@ public class Climber extends SubsystemBase {
     public void climbUp() {
 
         if (encoder.getPosition() < UPPER_LIMIT) {
-            climberMotor.set(0.7);
+            climberMotor.set(0.05);
         } else {
             climberMotor.set(0);
         }
@@ -49,7 +49,7 @@ public class Climber extends SubsystemBase {
     public void climbDown() {
 
         if (encoder.getPosition() > LOWER_LIMIT) {
-            climberMotor.set(-0.7);
+            climberMotor.set(-0.05);
         } else {
             climberMotor.set(0);
         }
