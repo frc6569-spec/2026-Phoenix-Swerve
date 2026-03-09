@@ -2,6 +2,8 @@ package frc.robot.subsystems;
 
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.math.filter.SlewRateLimiter;
+
 import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
@@ -11,14 +13,23 @@ import com.revrobotics.spark.config.SparkFlexConfig;
 public class Climber extends SubsystemBase {
 
     private final SparkFlex climberMotor = new SparkFlex(59, MotorType.kBrushless);
-
     private final RelativeEncoder encoder = climberMotor.getEncoder();
 
-    // position limits (example values)
+    // Smooth acceleration limiter
+    private final SlewRateLimiter limiter = new SlewRateLimiter(1.5);
+
+    // position limits
     public static final double REST = 0;
-    public static final double START = 4.5;
-    public static final double UPPER_LIMIT = 4.5;
-    public static final double LOWER_LIMIT = -4.5;
+    public static final double START = 0;
+    public static final double UPPER_LIMIT = 0;
+    public static final double LOWER_LIMIT = -350;
+
+    // motor outputs
+    private static final double CLIMB_POWER = 0.6;
+    private static final double HOLD_POWER = 0.00;
+
+    // LIMIT OVERRIDE FLAG
+    private boolean overrideLimits = false;
 
     public Climber() {
 
@@ -27,7 +38,7 @@ public class Climber extends SubsystemBase {
         SparkFlexConfig config = new SparkFlexConfig();
 
         config.idleMode(IdleMode.kBrake);
-        config.smartCurrentLimit(80);
+        config.smartCurrentLimit(100);
 
         climberMotor.configure(
             config,
@@ -36,28 +47,54 @@ public class Climber extends SubsystemBase {
         );
     }
 
+    /* ----------------------------
+     * Override Control
+     * ---------------------------- */
+
+    public void setOverride(boolean enabled) {
+        overrideLimits = enabled;
+    }
+
+    /* ----------------------------
+     * Climb Up
+     * ---------------------------- */
+
     public void climbUp() {
 
-        if (encoder.getPosition() < UPPER_LIMIT) {
-            climberMotor.set(0.05);
+        if (overrideLimits || encoder.getPosition() < UPPER_LIMIT) {
+            climberMotor.set(limiter.calculate(CLIMB_POWER));
         } else {
-            climberMotor.set(0);
+            stop();
         }
 
     }
+
+    /* ----------------------------
+     * Climb Down
+     * ---------------------------- */
 
     public void climbDown() {
 
-        if (encoder.getPosition() > LOWER_LIMIT) {
-            climberMotor.set(-0.05);
+        if (overrideLimits || encoder.getPosition() > LOWER_LIMIT) {
+            climberMotor.set(limiter.calculate(-CLIMB_POWER));
         } else {
-            climberMotor.set(0);
+            stop();
         }
 
     }
 
+    /* ----------------------------
+     * Stop / Hold
+     * ---------------------------- */
+
     public void stop() {
-        climberMotor.set(0);
+
+        if (encoder.getPosition() < -0.2) {
+            climberMotor.set(HOLD_POWER);
+        } else {
+            climberMotor.set(0);
+        }
+
     }
 
     @Override
@@ -65,10 +102,11 @@ public class Climber extends SubsystemBase {
 
         double position = encoder.getPosition();
 
-        SmartDashboard.putNumber("Climber Position", position);
-        SmartDashboard.putNumber("Climber Output", climberMotor.get());
-        SmartDashboard.putNumber("Climber Upper Limit", UPPER_LIMIT);
-        SmartDashboard.putNumber("Climber Lower Limit", LOWER_LIMIT);
+        //SmartDashboard.putNumber("Climber Position", position);
+        //SmartDashboard.putNumber("Climber Output", climberMotor.get());
+        //SmartDashboard.putBoolean("Climber Override", overrideLimits);
+        //SmartDashboard.putNumber("Climber Upper Limit", UPPER_LIMIT);
+        //SmartDashboard.putNumber("Climber Lower Limit", LOWER_LIMIT);
 
     }
 }

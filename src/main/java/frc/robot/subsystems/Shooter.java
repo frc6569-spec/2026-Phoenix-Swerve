@@ -5,35 +5,34 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.controls.VelocityVoltage;
-import com.ctre.phoenix6.controls.Follower;
-import com.ctre.phoenix6.signals.MotorAlignmentValue;
+import com.ctre.phoenix6.configs.TalonFXConfiguration;
 
 public class Shooter extends SubsystemBase {
 
     private final TalonFX shooterLeader = new TalonFX(57);
-    private final TalonFX shooterFollower = new TalonFX(58);
 
     private final VelocityVoltage velocityRequest = new VelocityVoltage(0);
 
-    public static final double SHOOT_SPEED = 60; // rotations per second
+    // Good high-performance speed for Falcon shooters
+    public static final double SHOOT_SPEED = 90;
 
     public Shooter() {
 
-        var config = shooterLeader.getConfigurator();
+        TalonFXConfiguration config = new TalonFXConfiguration();
 
-        var slot0Configs = new com.ctre.phoenix6.configs.Slot0Configs();
-        slot0Configs.kP = 0.12;
-        slot0Configs.kV = 0.12;
+        // PID + Feedforward (helps motor reach speed faster)
+        config.Slot0.kP = 0.18;
+        config.Slot0.kV = 0.22;
 
-        config.apply(slot0Configs);
+        // Current limit to prevent brownouts
+        config.CurrentLimits.SupplyCurrentLimitEnable = true;
+        config.CurrentLimits.SupplyCurrentLimit = 40;
 
-        // ✅ Proper Phoenix 6 follower setup
-        shooterFollower.setControl(
-            new Follower(
-                shooterLeader.getDeviceID(),
-                MotorAlignmentValue.Aligned
-            )
-        );
+        // Allow full voltage for max speed
+        config.Voltage.PeakForwardVoltage = 12.0;
+        config.Voltage.PeakReverseVoltage = -12.0;
+
+        shooterLeader.getConfigurator().apply(config);
     }
 
     public void spinShooter() {
@@ -46,17 +45,20 @@ public class Shooter extends SubsystemBase {
 
     public boolean atSpeed() {
         double speed = shooterLeader.getVelocity().getValueAsDouble();
-        return speed > SHOOT_SPEED * 0.9;   // 90% of target
+        return speed > SHOOT_SPEED * 0.9;
     }
 
     @Override
-    public void periodic() {
+public void periodic() {
 
-        double currentSpeed = shooterLeader.getVelocity().getValueAsDouble();
+    double velocityRPS = shooterLeader.getVelocity().getValueAsDouble();
+    double velocityRPM = velocityRPS * 60.0;
 
-        SmartDashboard.putNumber("Shooter Speed", currentSpeed);
-        SmartDashboard.putBoolean("Shooter At Speed", atSpeed());
-        SmartDashboard.putNumber("Shooter Target Speed", SHOOT_SPEED);
-        SmartDashboard.putNumber("Shooter Output", shooterLeader.get());
-    }
+    SmartDashboard.putNumber("Shooter Velocity RPS", velocityRPS);
+    SmartDashboard.putNumber("Shooter Velocity RPM", velocityRPM);
+    SmartDashboard.putNumber("Shooter Target RPS", SHOOT_SPEED);
+    SmartDashboard.putNumber("Shooter Target RPM", SHOOT_SPEED * 60);
+    SmartDashboard.putBoolean("Shooter At Speed", atSpeed());
+    SmartDashboard.putNumber("Shooter Output", shooterLeader.get());
+}
 }

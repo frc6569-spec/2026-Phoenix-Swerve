@@ -26,7 +26,6 @@ import frc.robot.subsystems.Intake;
 import frc.robot.subsystems.Shooter;
 import frc.robot.subsystems.Slide;
 import frc.robot.subsystems.Climber;
-import frc.robot.commands.ShootCommand;
 
 public class RobotContainer {
     //Subsystems
@@ -106,10 +105,29 @@ public class RobotContainer {
 
     drivetrain.registerTelemetry(logger::telemeterize);
     
-    // Shooter controls
-    driverXboxController.rightTrigger(.5)
-        .whileTrue(new ShootCommand(shooter, feeder));
+    // test shooter spin
+    driverXboxController.y()
+        .whileTrue(shooter.runEnd(
+            shooter::spinShooter,
+            shooter::stopShooter
+        ));
 
+    // Shooter controls
+    driverXboxController.rightTrigger(.3)
+    .whileTrue(
+        Commands.runEnd(
+            () -> {
+                shooter.spinShooter();
+                feeder.runFeeder();
+            },
+            () -> {
+                shooter.stopShooter();
+                feeder.stopFeeder();
+            },
+            shooter,
+            feeder
+        )
+    );
     // ----------------------------
     // Intake Controls
     // ----------------------------
@@ -136,8 +154,17 @@ public class RobotContainer {
     // Operator controls
     // ----------------------------
     // Extend Slide
-    operatorXboxController.a().onTrue(slide.runOnce(slide::extend));
-    operatorXboxController.b().onTrue(slide.runOnce(slide::retract));
+        operatorXboxController.a()
+        .whileTrue(slide.runEnd(
+            () -> slide.extend(),
+            () -> slide.stop()
+        ));
+
+        operatorXboxController.b()
+            .whileTrue(slide.runEnd(
+                () -> slide.retract(),
+                () -> slide.stop()
+            ));
 
     // Enable Climber
     operatorXboxController.start().onTrue(
@@ -163,6 +190,18 @@ public class RobotContainer {
         )
     );
 
+
+    // ----------------------------
+    // Feeder Test
+    // ----------------------------
+    operatorXboxController.x()
+        .whileTrue(
+            feeder.runEnd(
+                () -> feeder.runFeeder(),   // run while held
+                () -> feeder.stopFeeder()   // stop when released
+            )
+        );
+
     }
 
     public void periodic() {
@@ -175,6 +214,10 @@ public class RobotContainer {
         SmartDashboard.putNumber(
             "Operator LT",
             operatorXboxController.getLeftTriggerAxis()
+        );
+        SmartDashboard.putNumber(
+            "Driver Right Trigger",
+            driverXboxController.getRightTriggerAxis()
         );
     }
 

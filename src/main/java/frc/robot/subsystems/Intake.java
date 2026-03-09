@@ -23,10 +23,10 @@ public class Intake extends SubsystemBase {
     private final DutyCycleOut intakeRequest = new DutyCycleOut(0);
 
     // Positions
-    public static final double EXTENDED = 250.0;
+    public static final double EXTENDED = 25.0;
     public static final double RETRACTED = 0.0;
 
-    private static final double INTAKE_POWER = 1;
+    private static final double INTAKE_POWER = .5;
 
     public Intake() {
 
@@ -122,13 +122,13 @@ public class Intake extends SubsystemBase {
     @Override
     public void periodic() {
 
-        double extensionPosition = extensionLeader.getPosition().getValueAsDouble();
+        //double extensionPosition = extensionLeader.getPosition().getValueAsDouble();
 
-        SmartDashboard.putNumber("Intake Extension Position", extensionPosition);
-        SmartDashboard.putBoolean("Intake Extended", isExtended());
-        SmartDashboard.putNumber(
-            "Intake Roller Output",
-            intakeMotor.getDutyCycle().getValueAsDouble()
-        );
+        //SmartDashboard.putNumber("Intake Extension Position", extensionPosition);
+        //SmartDashboard.putBoolean("Intake Extended", isExtended());
+        //SmartDashboard.putNumber(
+            //"Intake Roller Output",
+            //intakeMotor.getDutyCycle().getValueAsDouble()
+        //);
     }
 }
