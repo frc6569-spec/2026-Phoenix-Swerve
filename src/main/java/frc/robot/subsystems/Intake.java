@@ -3,157 +3,202 @@ package frc.robot.subsystems;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
-import com.ctre.phoenix6.controls.PositionVoltage;
-import com.ctre.phoenix6.controls.DutyCycleOut;
-import com.ctre.phoenix6.controls.Follower;
-
 import com.ctre.phoenix6.hardware.TalonFX;
-import com.ctre.phoenix6.signals.MotorAlignmentValue;
-import com.ctre.phoenix6.signals.InvertedValue;
+import com.ctre.phoenix6.controls.MotionMagicVoltage;
+import com.ctre.phoenix6.controls.DutyCycleOut;
+
+import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.signals.*;
 
 public class Intake extends SubsystemBase {
 
-    // Extension motors
+    // Motors
     private final TalonFX extensionLeader = new TalonFX(53);
     private final TalonFX extensionFollower = new TalonFX(54);
-
-    // Intake roller
     private final TalonFX intakeMotor = new TalonFX(55);
 
-    private final PositionVoltage extensionRequest = new PositionVoltage(0);
+    // Control requests
+    private final MotionMagicVoltage motionRequest = new MotionMagicVoltage(0);
     private final DutyCycleOut intakeRequest = new DutyCycleOut(0);
 
-    // Arm geometry
+    // Gearbox constants
     private static final double GEAR_RATIO = 23.0;
     private static final double EXTEND_DEGREES = 110.0;
 
-    public static final double EXTENDED =
+    private static final double EXTENDED =
         (EXTEND_DEGREES / 360.0) * GEAR_RATIO;
 
-    public static final double RETRACTED = 0.0;
+    private static final double RETRACTED = 0.0;
 
-    // Intake roller speed (single variable like you requested)
-    private static final double INTAKE_POWER = 0.5;
+    // Intake states
+    private enum IntakeState {
+        RETRACTED,
+        EXTENDING,
+        EXTENDED,
+        RETRACTING
+    }
+
+    private IntakeState state = IntakeState.RETRACTED;
 
     public Intake() {
 
         extensionLeader.setPosition(0);
         extensionFollower.setPosition(0);
 
-        var leaderConfig = extensionLeader.getConfigurator();
-        var followerConfig = extensionFollower.getConfigurator();
-        var intakeConfig = intakeMotor.getConfigurator();
+        extensionLeader.setNeutralMode(NeutralModeValue.Brake);
+        extensionFollower.setNeutralMode(NeutralModeValue.Brake);
+        intakeMotor.setNeutralMode(NeutralModeValue.Brake);
 
-        // Motor direction
-        var motorOutput = new com.ctre.phoenix6.configs.MotorOutputConfigs();
-        motorOutput.Inverted = InvertedValue.Clockwise_Positive;
-        leaderConfig.apply(motorOutput);
+        // Leader configuration
+        TalonFXConfiguration leaderConfig = new TalonFXConfiguration();
 
-        // Current limits
-        var currentLimits = new com.ctre.phoenix6.configs.CurrentLimitsConfigs();
+        leaderConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
 
-        currentLimits.SupplyCurrentLimit = 40;
-        currentLimits.SupplyCurrentLimitEnable = true;
+        leaderConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+        leaderConfig.CurrentLimits.SupplyCurrentLimit = 40;
 
-        leaderConfig.apply(currentLimits);
-        followerConfig.apply(currentLimits);
-        intakeConfig.apply(currentLimits);
+        leaderConfig.CurrentLimits.StatorCurrentLimitEnable = true;
+        leaderConfig.CurrentLimits.StatorCurrentLimit = 100;
 
-        // Follower motor
-        extensionFollower.setControl(
-            new Follower(
-                extensionLeader.getDeviceID(),
-                MotorAlignmentValue.Opposed
-            )
-        );
+        // Torque limits (prevents motor fighting)
+        leaderConfig.TorqueCurrent.PeakForwardTorqueCurrent = 70;
+        leaderConfig.TorqueCurrent.PeakReverseTorqueCurrent = -70;
+
+        // Torque ramp smoothing
+        leaderConfig.ClosedLoopRamps.TorqueClosedLoopRampPeriod = 0.1;
 
         // PID
-        var slot0Configs = new com.ctre.phoenix6.configs.Slot0Configs();
-        slot0Configs.kP = 10.0;
-        leaderConfig.apply(slot0Configs);
+        leaderConfig.Slot0.kP = 20;
+        leaderConfig.Slot0.kD = 0.2;
 
-        // Soft limits
-        var softLimits = new com.ctre.phoenix6.configs.SoftwareLimitSwitchConfigs();
+        // Motion Magic
+        leaderConfig.MotionMagic.MotionMagicCruiseVelocity = 25;
+        leaderConfig.MotionMagic.MotionMagicAcceleration = 50;
 
-        softLimits.ForwardSoftLimitEnable = true;
-        softLimits.ForwardSoftLimitThreshold = EXTENDED;
+        // Motion smoothing (S-curve)
+        leaderConfig.MotionMagic.MotionMagicJerk = 200;
 
-        softLimits.ReverseSoftLimitEnable = true;
-        softLimits.ReverseSoftLimitThreshold = RETRACTED;
+        leaderConfig.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
+        leaderConfig.SoftwareLimitSwitch.ForwardSoftLimitThreshold = EXTENDED;
 
-        leaderConfig.apply(softLimits);
+        leaderConfig.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
+        leaderConfig.SoftwareLimitSwitch.ReverseSoftLimitThreshold = RETRACTED;
 
-        // SmartDashboard slider ONLY for extension speed
-        SmartDashboard.putNumber("Extension Speed Limit", 0.25);
+        // Follower configuration (same but inverted)
+        TalonFXConfiguration followerConfig = new TalonFXConfiguration();
+
+        followerConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
+
+        followerConfig.CurrentLimits = leaderConfig.CurrentLimits;
+        followerConfig.TorqueCurrent = leaderConfig.TorqueCurrent;
+        followerConfig.ClosedLoopRamps = leaderConfig.ClosedLoopRamps;
+        followerConfig.Slot0 = leaderConfig.Slot0;
+        followerConfig.MotionMagic = leaderConfig.MotionMagic;
+        followerConfig.SoftwareLimitSwitch = leaderConfig.SoftwareLimitSwitch;
+
+        extensionLeader.getConfigurator().apply(leaderConfig);
+        extensionFollower.getConfigurator().apply(followerConfig);
+
+        SmartDashboard.putNumber("Intake Roller Speed", 0.6);
     }
 
-    // Extend arm
-    public void extendIntake() {
-
-        extensionLeader.setControl(
-            extensionRequest.withPosition(EXTENDED)
-        );
-
+    public void extend() {
+        state = IntakeState.EXTENDING;
     }
 
-    // Retract arm
-    public void retractIntake() {
-
-        extensionLeader.setControl(
-            extensionRequest.withPosition(RETRACTED)
-        );
-
-        stopIntake();
+    public void retract() {
+        state = IntakeState.RETRACTING;
     }
 
-    // Intake roller
-    public void runIntake() {
+    private void runIntake() {
+
+        double speed = SmartDashboard.getNumber("Intake Roller Speed", 0.6);
 
         intakeMotor.setControl(
-            intakeRequest.withOutput(INTAKE_POWER)
+            intakeRequest.withOutput(speed)
         );
-
     }
 
-    public void stopIntake() {
+    private void stopIntake() {
 
         intakeMotor.setControl(
-            intakeRequest.withOutput(0.0)
+            intakeRequest.withOutput(0)
         );
-
     }
 
-    public boolean isExtended() {
+    private boolean isExtended() {
 
-        double position = extensionLeader.getPosition().getValueAsDouble();
-        return position >= EXTENDED * 0.9;
+        return extensionLeader
+            .getPosition()
+            .getValueAsDouble() >= EXTENDED * 0.95;
+    }
 
+    private boolean isRetracted() {
+
+        return extensionLeader
+            .getPosition()
+            .getValueAsDouble() <= 0.05;
     }
 
     @Override
     public void periodic() {
 
-        // Read extension speed slider
-        double speedLimit =
-            SmartDashboard.getNumber("Extension Speed Limit", 0.25);
+        switch (state) {
 
-        // Apply speed limit to extension motor only
-        var outputLimit = new com.ctre.phoenix6.configs.MotorOutputConfigs();
+            case EXTENDING:
 
-        outputLimit.PeakForwardDutyCycle = speedLimit;
-        outputLimit.PeakReverseDutyCycle = -speedLimit;
+                extensionLeader.setControl(
+                    motionRequest.withPosition(EXTENDED)
+                );
 
-        extensionLeader.getConfigurator().apply(outputLimit);
+                extensionFollower.setControl(
+                    motionRequest.withPosition(EXTENDED)
+                );
 
-        // Telemetry
-        double motorRotations =
+                if (isExtended()) {
+                    runIntake();
+                    state = IntakeState.EXTENDED;
+                }
+
+            break;
+
+            case RETRACTING:
+
+                stopIntake();
+
+                extensionLeader.setControl(
+                    motionRequest.withPosition(RETRACTED)
+                );
+
+                extensionFollower.setControl(
+                    motionRequest.withPosition(RETRACTED)
+                );
+
+                if (isRetracted()) {
+                    state = IntakeState.RETRACTED;
+                }
+
+            break;
+
+            case EXTENDED:
+            break;
+
+            case RETRACTED:
+            break;
+        }
+
+        double leaderRot =
             extensionLeader.getPosition().getValueAsDouble();
 
-        double armDegrees =
-            (motorRotations / GEAR_RATIO) * 360.0;
+        double followerRot =
+            extensionFollower.getPosition().getValueAsDouble();
 
-        SmartDashboard.putNumber("Intake Motor Rotations", motorRotations);
-        SmartDashboard.putNumber("Intake Arm Degrees", armDegrees);
-        SmartDashboard.putBoolean("Intake Extended", isExtended());
+        double degrees =
+            (leaderRot / GEAR_RATIO) * 360;
+
+        SmartDashboard.putNumber("Leader Rotations", leaderRot);
+        SmartDashboard.putNumber("Follower Rotations", followerRot);
+        SmartDashboard.putNumber("Intake Degrees", degrees);
+        SmartDashboard.putString("Intake State", state.toString());
     }
 }

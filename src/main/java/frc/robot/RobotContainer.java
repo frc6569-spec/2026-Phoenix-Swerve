@@ -17,8 +17,6 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
-import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.Feeder;
@@ -132,23 +130,16 @@ public class RobotContainer {
     // Intake Controls
     // ----------------------------
     // Extend intake and start rollers automatically
+    // Extend intake (rollers will start automatically when open)
     driverXboxController.rightBumper()
-        .debounce(0.25)    
+        .debounce(0.25)
         .and(() -> !climbEnabled)
-        .onTrue(
-            intake.runOnce(intake::extendIntake)
-                .andThen(new WaitUntilCommand(intake::isExtended))
-                .andThen(intake.runOnce(intake::runIntake))
-        );
-    // Retract intake and stop rollers
+        .onTrue(intake.runOnce(intake::extend));
+
+    // Retract intake (rollers automatically stop)
     driverXboxController.leftBumper()
         .debounce(0.25)
-        .onTrue(
-            intake.runOnce(() -> {
-                intake.stopIntake();
-                intake.retractIntake();
-            })
-        );
+        .onTrue(intake.runOnce(intake::retract));
 
     // ----------------------------    
     // Operator controls
