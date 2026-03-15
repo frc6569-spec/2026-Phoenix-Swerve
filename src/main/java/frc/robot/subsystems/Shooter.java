@@ -6,59 +6,149 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.signals.InvertedValue;
 
 public class Shooter extends SubsystemBase {
 
     private final TalonFX shooterLeader = new TalonFX(57);
+    private final TalonFX shooterFollower = new TalonFX(58);
 
     private final VelocityVoltage velocityRequest = new VelocityVoltage(0);
 
-    // Good high-performance speed for Falcon shooters
-    public static final double SHOOT_SPEED = 90;
+    private final Feeder feeder;
 
-    public Shooter() {
+    // Default shooter speed
+    private static final double DEFAULT_SHOOT_SPEED = 50;
 
-        TalonFXConfiguration config = new TalonFXConfiguration();
+    private boolean shooterEnabled = false;
 
-        // PID + Feedforward (helps motor reach speed faster)
-        config.Slot0.kP = 0.18;
-        config.Slot0.kV = 0.22;
+    public Shooter(Feeder feeder) {
 
-        // Current limit to prevent brownouts
-        config.CurrentLimits.SupplyCurrentLimitEnable = true;
-        config.CurrentLimits.SupplyCurrentLimit = 40;
+        this.feeder = feeder;
 
-        // Allow full voltage for max speed
-        config.Voltage.PeakForwardVoltage = 12.0;
-        config.Voltage.PeakReverseVoltage = -12.0;
+        TalonFXConfiguration leaderConfig = new TalonFXConfiguration();
 
-        shooterLeader.getConfigurator().apply(config);
+        leaderConfig.Slot0.kP = 0.18;
+        leaderConfig.Slot0.kV = 0.24;
+
+        leaderConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+        leaderConfig.CurrentLimits.SupplyCurrentLimit = 40;
+
+        leaderConfig.Voltage.PeakForwardVoltage = 12.0;
+        leaderConfig.Voltage.PeakReverseVoltage = -12.0;
+
+        leaderConfig.ClosedLoopRamps.VoltageClosedLoopRampPeriod = 0.25;
+
+        leaderConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
+
+        TalonFXConfiguration followerConfig = new TalonFXConfiguration();
+
+        followerConfig.Slot0 = leaderConfig.Slot0;
+        followerConfig.CurrentLimits = leaderConfig.CurrentLimits;
+        followerConfig.Voltage = leaderConfig.Voltage;
+        followerConfig.ClosedLoopRamps = leaderConfig.ClosedLoopRamps;
+
+        followerConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
+
+        shooterLeader.getConfigurator().apply(leaderConfig);
+        shooterFollower.getConfigurator().apply(followerConfig);
+
+        // Initialize dashboard control
+        SmartDashboard.putNumber("Shooter Target RPS", DEFAULT_SHOOT_SPEED);
     }
 
     public void spinShooter() {
-        shooterLeader.setControl(velocityRequest.withVelocity(SHOOT_SPEED));
+
+        shooterEnabled = true;
+
+        double targetSpeed =
+            SmartDashboard.getNumber("Shooter Target RPS", DEFAULT_SHOOT_SPEED);
+
+        shooterLeader.setControl(
+            velocityRequest.withVelocity(targetSpeed)
+        );
+
+        shooterFollower.setControl(
+            velocityRequest.withVelocity(targetSpeed)
+        );
+    }
+
+    // NEW METHOD (used by Limelight auto aiming)
+    public void setSpeed(double speed) {
+
+        shooterEnabled = true;
+
+        SmartDashboard.putNumber("Shooter Target RPS", speed);
+
+        shooterLeader.setControl(
+            velocityRequest.withVelocity(speed)
+        );
+
+        shooterFollower.setControl(
+            velocityRequest.withVelocity(speed)
+        );
     }
 
     public void stopShooter() {
-        shooterLeader.setControl(velocityRequest.withVelocity(0));
+
+        shooterEnabled = false;
+
+        shooterLeader.setControl(
+            velocityRequest.withVelocity(0)
+        );
+
+        shooterFollower.setControl(
+            velocityRequest.withVelocity(0)
+        );
+
+        feeder.stopFeeder();
     }
 
     public boolean atSpeed() {
-        double speed = shooterLeader.getVelocity().getValueAsDouble();
-        return speed > SHOOT_SPEED * 0.9;
+
+        double targetSpeed =
+            SmartDashboard.getNumber("Shooter Target RPS", DEFAULT_SHOOT_SPEED);
+
+        double speed =
+            shooterLeader.getVelocity().getValueAsDouble();
+
+        return speed > targetSpeed * 0.9;
+    }
+
+    public double getSpeedForDistance(double distance) {
+
+        if (distance < 1.5) return 60;
+        if (distance < 2.5) return 70;
+        if (distance < 3.5) return 80;
+        if (distance < 4.5) return 90;
+
+        return 110;
     }
 
     @Override
-public void periodic() {
+    public void periodic() {
 
-    double velocityRPS = shooterLeader.getVelocity().getValueAsDouble();
-    double velocityRPM = velocityRPS * 60.0;
+        double velocityRPS =
+            shooterLeader.getVelocity().getValueAsDouble();
 
-    SmartDashboard.putNumber("Shooter Velocity RPS", velocityRPS);
-    SmartDashboard.putNumber("Shooter Velocity RPM", velocityRPM);
-    SmartDashboard.putNumber("Shooter Target RPS", SHOOT_SPEED);
-    SmartDashboard.putNumber("Shooter Target RPM", SHOOT_SPEED * 60);
-    SmartDashboard.putBoolean("Shooter At Speed", atSpeed());
-    SmartDashboard.putNumber("Shooter Output", shooterLeader.get());
-}
+        double velocityRPM = velocityRPS * 60.0;
+
+        double targetSpeed =
+            SmartDashboard.getNumber("Shooter Target RPS", DEFAULT_SHOOT_SPEED);
+
+        // Automatic feeding
+        if (shooterEnabled && atSpeed()) {
+            feeder.runFeeder();
+        }
+
+        if (!shooterEnabled) {
+            feeder.stopFeeder();
+        }
+
+        SmartDashboard.putNumber("Shooter Velocity RPS", velocityRPS);
+        SmartDashboard.putNumber("Shooter Velocity RPM", velocityRPM);
+        SmartDashboard.putNumber("Shooter Target RPM", targetSpeed * 60);
+        SmartDashboard.putBoolean("Shooter At Speed", atSpeed());
+        SmartDashboard.putNumber("Shooter Output", shooterLeader.get());
+    }
 }
