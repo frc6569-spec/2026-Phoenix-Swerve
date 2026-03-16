@@ -18,10 +18,12 @@ public class Intake extends SubsystemBase {
     private final TalonFX extensionLeader = new TalonFX(53);
     private final TalonFX extensionFollower = new TalonFX(54);
     private final TalonFX intakeMotor = new TalonFX(55);
+    private final TalonFX assistMotor = new TalonFX(51);
 
     private final MotionMagicVoltage motionRequest = new MotionMagicVoltage(0);
     private final VelocityVoltage intakeVelocity = new VelocityVoltage(0);
     private final VoltageOut intakeRequest = new VoltageOut(0);
+    private final VoltageOut assistRequest = new VoltageOut(0);
 
     private static final double GEAR_RATIO = 23.0;
     private static final double DEFAULT_EXTEND_DEGREES = 135.0;
@@ -66,6 +68,7 @@ public class Intake extends SubsystemBase {
         extensionLeader.setNeutralMode(NeutralModeValue.Brake);
         extensionFollower.setNeutralMode(NeutralModeValue.Brake);
         intakeMotor.setNeutralMode(NeutralModeValue.Coast);
+        assistMotor.setNeutralMode(NeutralModeValue.Coast);
 
         TalonFXConfiguration leaderConfig = new TalonFXConfiguration();
 
@@ -114,6 +117,8 @@ public class Intake extends SubsystemBase {
 
         TalonFXConfiguration intakeConfig = new TalonFXConfiguration();
 
+        intakeConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
+
         intakeConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
         intakeConfig.CurrentLimits.SupplyCurrentLimit = 80;
 
@@ -125,8 +130,21 @@ public class Intake extends SubsystemBase {
 
         intakeMotor.getConfigurator().apply(intakeConfig);
 
+        TalonFXConfiguration assistConfig = new TalonFXConfiguration();
+
+        assistConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
+
+        assistConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+        assistConfig.CurrentLimits.SupplyCurrentLimit = 60;
+
+        assistConfig.CurrentLimits.StatorCurrentLimitEnable = true;
+        assistConfig.CurrentLimits.StatorCurrentLimit = 100;
+
+        assistMotor.getConfigurator().apply(assistConfig);
+
         SmartDashboard.putNumber("Intake Roller Speed", 1.0);
-        SmartDashboard.putNumber("Intake Target Velocity", 80);
+        SmartDashboard.putNumber("Intake Target Velocity", 95);
+        SmartDashboard.putNumber("Intake Assist Speed", 0.15);
 
         SmartDashboard.putNumber("Intake Extend Degrees", DEFAULT_EXTEND_DEGREES);
         SmartDashboard.putNumber("Intake Pushback Degrees", 75.0);
@@ -180,17 +198,36 @@ public class Intake extends SubsystemBase {
         toggleExtended = false;
     }
 
+    private void runAssist() {
+
+        double speed =
+            SmartDashboard.getNumber("Intake Assist Speed", 0.15);
+
+        assistMotor.setControl(
+            assistRequest.withOutput(speed * 6.0)
+        );
+    }
+
+    private void stopAssist() {
+
+        assistMotor.setControl(
+            assistRequest.withOutput(0)
+        );
+    }
+
     private void runIntake() {
 
         double speed =
             SmartDashboard.getNumber("Intake Roller Speed", 1.0);
 
         double velocity =
-            SmartDashboard.getNumber("Intake Target Velocity", 80);
+            SmartDashboard.getNumber("Intake Target Velocity", 95);
 
         intakeMotor.setControl(
             intakeVelocity.withVelocity(velocity * speed)
         );
+
+        runAssist();
     }
 
     private void stopIntake() {
@@ -198,6 +235,8 @@ public class Intake extends SubsystemBase {
         intakeMotor.setControl(
             intakeRequest.withOutput(0)
         );
+
+        stopAssist();
     }
 
     private boolean isExtended(double extended) {
@@ -222,36 +261,6 @@ public class Intake extends SubsystemBase {
 
         double EXTENDED =
             (extendDegrees / 360.0) * GEAR_RATIO;
-
-        double statorCurrent =
-            extensionLeader.getStatorCurrent().getValueAsDouble();
-
-        double currentPosition =
-            extensionLeader.getPosition().getValueAsDouble();
-
-        if (collisionCooldown > 0) {
-            collisionCooldown--;
-        }
-
-        if (state == IntakeState.EXTENDED
-            && statorCurrent > COLLISION_CURRENT
-            && !collisionActive
-            && collisionCooldown == 0) {
-
-            collisionActive = true;
-            collisionCooldown = COLLISION_COOLDOWN_LOOPS;
-
-            double safePosition =
-                currentPosition - COLLISION_RETRACT_ROTATIONS;
-
-            setArmPosition(safePosition);
-        }
-
-        if (collisionActive && statorCurrent < COLLISION_CURRENT * 0.5) {
-
-            collisionActive = false;
-            setArmPosition(EXTENDED);
-        }
 
         switch (state) {
 
@@ -291,22 +300,5 @@ public class Intake extends SubsystemBase {
             case RETRACTED:
             break;
         }
-
-        double leaderRot =
-            extensionLeader.getPosition().getValueAsDouble();
-
-        double followerRot =
-            extensionFollower.getPosition().getValueAsDouble();
-
-        double degrees =
-            (leaderRot / GEAR_RATIO) * 360;
-
-        SmartDashboard.putNumber("Leader Rotations", leaderRot);
-        SmartDashboard.putNumber("Follower Rotations", followerRot);
-        SmartDashboard.putNumber("Intake Degrees", degrees);
-        SmartDashboard.putNumber("Target Rotations", leaderTarget);
-        SmartDashboard.putNumber("Intake Stator Current",
-            extensionLeader.getStatorCurrent().getValueAsDouble());
-        SmartDashboard.putString("Intake State", state.toString());
     }
 }

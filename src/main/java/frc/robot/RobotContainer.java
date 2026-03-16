@@ -7,15 +7,12 @@ import com.ctre.phoenix6.swerve.SwerveRequest;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
-
-import com.pathplanner.lib.auto.AutoBuilder;
 
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
@@ -35,11 +32,6 @@ public class RobotContainer {
     private final Limelight limelight = new Limelight();
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
-
-    //----------------------------
-    // PathPlanner Auto Chooser
-    //----------------------------
-    private final SendableChooser<Command> autoChooser;
 
     //----------------------------
     // Drive config
@@ -64,15 +56,7 @@ public class RobotContainer {
     private final CommandXboxController operatorXboxController = new CommandXboxController(1);
 
     public RobotContainer() {
-
         configureBindings();
-
-        //--------------------------------
-        // Build PathPlanner auto chooser
-        //--------------------------------
-        autoChooser = AutoBuilder.buildAutoChooser();
-
-        SmartDashboard.putData("Auto Chooser", autoChooser);
     }
 
     private void configureBindings() {
@@ -102,7 +86,6 @@ public class RobotContainer {
                 if (autoAim && limelight.hasTarget()) {
 
                     double tx = limelight.getTX();
-
                     double kP = 0.02;
 
                     if (Math.abs(tx) < 1.0)
@@ -238,6 +221,11 @@ public class RobotContainer {
         SmartDashboard.putNumber("Limelight TX", limelight.getTX());
         SmartDashboard.putNumber("Limelight Distance", limelight.getDistanceMeters());
         SmartDashboard.putBoolean("Limelight Has Target", limelight.hasTarget());
+
+        SmartDashboard.putNumber("Robot X", drivetrain.getState().Pose.getX());
+        SmartDashboard.putNumber("Robot Y", drivetrain.getState().Pose.getY());
+        SmartDashboard.putNumber("Robot Heading",
+            drivetrain.getState().Pose.getRotation().getDegrees());
     }
 
     //--------------------------------
@@ -245,6 +233,6 @@ public class RobotContainer {
     //--------------------------------
     public Command getAutonomousCommand() {
 
-        return autoChooser.getSelected();
+        return Commands.none(); // No auto yet
     }
 }
