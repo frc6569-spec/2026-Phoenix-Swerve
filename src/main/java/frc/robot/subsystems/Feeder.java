@@ -6,7 +6,8 @@ import edu.wpi.first.wpilibj.Timer;
 
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.controls.DutyCycleOut;
-import com.ctre.phoenix6.configs.CurrentLimitsConfigs;
+import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.signals.NeutralModeValue;
 
 public class Feeder extends SubsystemBase {
 
@@ -24,13 +25,15 @@ public class Feeder extends SubsystemBase {
 
     public Feeder() {
 
-        var config = feederMotor.getConfigurator();
+        TalonFXConfiguration config = new TalonFXConfiguration();
 
-        var currentLimits = new CurrentLimitsConfigs();
-        currentLimits.SupplyCurrentLimit = 30.0;
-        currentLimits.SupplyCurrentLimitEnable = true;
+        config.CurrentLimits.SupplyCurrentLimitEnable = true;
+        config.CurrentLimits.SupplyCurrentLimit = 30;
 
-        config.apply(currentLimits);
+        // Set feeder motor to COAST
+        config.MotorOutput.NeutralMode = NeutralModeValue.Coast;
+
+        feederMotor.getConfigurator().apply(config);
 
         pulseTimer.start();
     }
@@ -107,9 +110,8 @@ public class Feeder extends SubsystemBase {
 
             pulseLogic();
             SmartDashboard.putString("Feeder Mode", "Pulse");
-        }
 
-        else {
+        } else {
 
             feederMotor.setControl(
                 feederRequest.withOutput(0)

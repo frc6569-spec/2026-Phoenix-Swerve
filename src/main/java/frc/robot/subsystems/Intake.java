@@ -30,20 +30,10 @@ public class Intake extends SubsystemBase {
 
     private static final double RETRACTED = 0.0;
 
+    // Kraken max speed
+    private static final double MAX_RPS = 100.0;
+
     private boolean toggleExtended = false;
-
-    private static final double COLLISION_CURRENT = 80;
-    private static final double COLLISION_RETRACT_DEGREES = 10;
-
-    private static final double COLLISION_RETRACT_ROTATIONS =
-        (COLLISION_RETRACT_DEGREES / 360.0) * GEAR_RATIO;
-
-    private static final int COLLISION_COOLDOWN_LOOPS = 50;
-
-    private int collisionCooldown = 0;
-    private boolean collisionActive = false;
-
-    private double leaderTarget = 0;
 
     private enum IntakeState {
         RETRACTED,
@@ -143,16 +133,12 @@ public class Intake extends SubsystemBase {
         assistMotor.getConfigurator().apply(assistConfig);
 
         SmartDashboard.putNumber("Intake Roller Speed", 1.0);
-        SmartDashboard.putNumber("Intake Target Velocity", 95);
-        SmartDashboard.putNumber("Intake Assist Speed", 0.15);
-
+        SmartDashboard.putNumber("Intake Assist Speed", 0.25);
         SmartDashboard.putNumber("Intake Extend Degrees", DEFAULT_EXTEND_DEGREES);
         SmartDashboard.putNumber("Intake Pushback Degrees", 75.0);
     }
 
     private void setArmPosition(double position) {
-
-        leaderTarget = position;
 
         extensionLeader.setControl(
             motionRequest.withPosition(position)
@@ -194,6 +180,7 @@ public class Intake extends SubsystemBase {
     }
 
     public void retract() {
+
         state = IntakeState.RETRACTING;
         toggleExtended = false;
     }
@@ -201,7 +188,7 @@ public class Intake extends SubsystemBase {
     private void runAssist() {
 
         double speed =
-            SmartDashboard.getNumber("Intake Assist Speed", 0.15);
+            SmartDashboard.getNumber("Intake Assist Speed", 0.25);
 
         assistMotor.setControl(
             assistRequest.withOutput(speed * 6.0)
@@ -220,11 +207,8 @@ public class Intake extends SubsystemBase {
         double speed =
             SmartDashboard.getNumber("Intake Roller Speed", 1.0);
 
-        double velocity =
-            SmartDashboard.getNumber("Intake Target Velocity", 95);
-
         intakeMotor.setControl(
-            intakeVelocity.withVelocity(velocity * speed)
+            intakeVelocity.withVelocity(MAX_RPS * speed)
         );
 
         runAssist();
@@ -251,6 +235,26 @@ public class Intake extends SubsystemBase {
         return extensionLeader
             .getPosition()
             .getValueAsDouble() <= 0.05;
+    }
+
+    public void goToPushback() {
+
+        double pushbackDegrees =
+            SmartDashboard.getNumber("Intake Pushback Degrees", 75.0);
+
+        double PUSHBACK =
+            (pushbackDegrees / 360.0) * GEAR_RATIO;
+
+        // Go directly to pushback position
+        setArmPosition(PUSHBACK);
+
+        // Run intake + feeder
+        runIntake();
+        feeder.setIntakeActive(true);
+
+        // Force correct state
+        state = IntakeState.EXTENDED;
+        toggleExtended = false;
     }
 
     @Override

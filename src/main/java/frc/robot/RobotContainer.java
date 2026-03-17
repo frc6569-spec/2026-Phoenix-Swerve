@@ -4,6 +4,7 @@ import static edu.wpi.first.units.Units.*;
 
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
+import com.pathplanner.lib.auto.AutoBuilder;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -13,6 +14,7 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
@@ -20,6 +22,7 @@ import frc.robot.subsystems.Feeder;
 import frc.robot.subsystems.Intake;
 import frc.robot.subsystems.Shooter;
 import frc.robot.subsystems.Limelight;
+import com.pathplanner.lib.auto.NamedCommands;
 
 public class RobotContainer {
 
@@ -30,6 +33,7 @@ public class RobotContainer {
     private final Intake intake = new Intake(feeder);
     private final Shooter shooter = new Shooter(feeder);
     private final Limelight limelight = new Limelight();
+    private final SendableChooser<Command> autoChooser;
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
 
@@ -56,6 +60,57 @@ public class RobotContainer {
     private final CommandXboxController operatorXboxController = new CommandXboxController(1);
 
     public RobotContainer() {
+
+        //--------------------------------
+        // PATHPLANNER NAMED COMMANDS (AUTO)
+        //--------------------------------
+        // These names MUST match your event markers in PathPlanner
+        // Example markers: "Intake", "Shoot"
+
+        NamedCommands.registerCommand(
+            "Intake Pushback Position",
+            Commands.runOnce(
+                () -> intake.goToPushback(),
+                intake
+            )
+        );
+
+        NamedCommands.registerCommand(
+            "Shoot",
+            Commands.sequence(
+
+                // Set shooter speed FIRST
+                Commands.runOnce(() -> shooter.setSpeed(0.45), shooter),
+
+                // Then spin shooter
+                Commands.runOnce(() -> shooter.spinShooter(), shooter),
+
+                // Wait for spin-up
+                Commands.waitSeconds(1.5),
+
+                // Feed
+                Commands.runEnd(
+                    () -> feeder.runFeeder(),
+                    () -> feeder.stopFeeder(),
+                    feeder
+                ).withTimeout(2.0),
+
+                // Stop shooter
+                Commands.runOnce(() -> shooter.stopShooter(), shooter)
+            )
+        );
+        //--------------------------------
+        // AUTO CHOOSER (SELECT AUTOS ON DASHBOARD)
+        //--------------------------------
+        // Autos are created in PathPlanner as ".auto" files
+        // They appear here automatically
+
+        autoChooser = AutoBuilder.buildAutoChooser();
+        SmartDashboard.putData("Auto Chooser", autoChooser);
+
+        //--------------------------------
+        // CONTROLLER BINDINGS
+        //--------------------------------
         configureBindings();
     }
 
@@ -233,7 +288,7 @@ public class RobotContainer {
     //--------------------------------
     public Command getAutonomousCommand() {
 
-        return Commands.none(); // No auto yet
+        return autoChooser.getSelected();
     }
     // branch bills-dev
 }
