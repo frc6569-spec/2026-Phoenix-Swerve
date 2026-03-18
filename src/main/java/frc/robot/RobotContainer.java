@@ -80,7 +80,7 @@ public class RobotContainer {
             Commands.sequence(
 
                 // Set shooter speed FIRST
-                Commands.runOnce(() -> shooter.setSpeed(0.45), shooter),
+                Commands.runOnce(() -> shooter.setSpeed(50), shooter),
 
                 // Then spin shooter
                 Commands.runOnce(() -> shooter.spinShooter(), shooter),
@@ -93,7 +93,7 @@ public class RobotContainer {
                     () -> feeder.runFeeder(),
                     () -> feeder.stopFeeder(),
                     feeder
-                ).withTimeout(2.0),
+                ).withTimeout(10.0),
 
                 // Stop shooter
                 Commands.runOnce(() -> shooter.stopShooter(), shooter)
