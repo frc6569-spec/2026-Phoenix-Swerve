@@ -13,7 +13,7 @@ import com.ctre.phoenix6.signals.*;
 
 public class Intake extends SubsystemBase {
 
-    private final Feeder feeder;
+    private final Feeder feeder; // still exists but NOT used
 
     private final TalonFX extensionLeader = new TalonFX(53);
     private final TalonFX extensionFollower = new TalonFX(54);
@@ -26,11 +26,9 @@ public class Intake extends SubsystemBase {
     private final VoltageOut assistRequest = new VoltageOut(0);
 
     private static final double GEAR_RATIO = 23.0;
-    private static final double DEFAULT_EXTEND_DEGREES = 135.0;
-
+    private static final double DEFAULT_EXTEND_DEGREES = 134.0;
     private static final double RETRACTED = 0.0;
 
-    // Kraken max speed
     private static final double MAX_RPS = 100.0;
 
     private boolean toggleExtended = false;
@@ -171,9 +169,7 @@ public class Intake extends SubsystemBase {
         } else {
 
             setArmPosition(PUSHBACK);
-
             runIntake();
-            feeder.setIntakeActive(true);
 
             toggleExtended = false;
         }
@@ -245,14 +241,9 @@ public class Intake extends SubsystemBase {
         double PUSHBACK =
             (pushbackDegrees / 360.0) * GEAR_RATIO;
 
-        // Go directly to pushback position
         setArmPosition(PUSHBACK);
-
-        // Run intake + feeder
         runIntake();
-        feeder.setIntakeActive(true);
 
-        // Force correct state
         state = IntakeState.EXTENDED;
         toggleExtended = false;
     }
@@ -275,7 +266,6 @@ public class Intake extends SubsystemBase {
                 if (isExtended(EXTENDED)) {
 
                     runIntake();
-                    feeder.setIntakeActive(true);
                     state = IntakeState.EXTENDED;
                 }
 
@@ -284,7 +274,6 @@ public class Intake extends SubsystemBase {
             case RETRACTING:
 
                 stopIntake();
-                feeder.setIntakeActive(false);
 
                 setArmPosition(RETRACTED);
 
@@ -297,7 +286,6 @@ public class Intake extends SubsystemBase {
             case EXTENDED:
 
                 runIntake();
-                feeder.setIntakeActive(true);
 
             break;
 
