@@ -20,7 +20,7 @@ public class Shooter extends SubsystemBase {
     private final Feeder feeder;
 
     // Default shooter speed
-    private static final double DEFAULT_SHOOT_SPEED = 40; // Changed this from 50 for fundraiser
+    private static final double DEFAULT_SHOOT_SPEED = 45; // Changed this from 50 for fundraiser
 
     // Idle speed (keeps flywheel spinning slowly)
     private static final double IDLE_SPEED = 10;

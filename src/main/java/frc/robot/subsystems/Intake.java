@@ -13,7 +13,7 @@ import com.ctre.phoenix6.signals.*;
 
 public class Intake extends SubsystemBase {
 
-    private final Feeder feeder; // still exists but NOT used
+    private final Feeder feeder; // not used, kept for compatibility
 
     private final TalonFX extensionLeader = new TalonFX(53);
     private final TalonFX extensionFollower = new TalonFX(54);
@@ -26,7 +26,7 @@ public class Intake extends SubsystemBase {
     private final VoltageOut assistRequest = new VoltageOut(0);
 
     private static final double GEAR_RATIO = 23.0;
-    private static final double DEFAULT_EXTEND_DEGREES = 134.0;
+    private static final double DEFAULT_EXTEND_DEGREES = 130.0;
     private static final double RETRACTED = 0.0;
 
     private static final double MAX_RPS = 100.0;
@@ -61,7 +61,6 @@ public class Intake extends SubsystemBase {
         TalonFXConfiguration leaderConfig = new TalonFXConfiguration();
 
         leaderConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
-        leaderConfig.MotorOutput.DutyCycleNeutralDeadband = 0.02;
 
         leaderConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
         leaderConfig.CurrentLimits.SupplyCurrentLimit = 40;
@@ -69,18 +68,12 @@ public class Intake extends SubsystemBase {
         leaderConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         leaderConfig.CurrentLimits.StatorCurrentLimit = 90;
 
-        leaderConfig.TorqueCurrent.PeakForwardTorqueCurrent = 65;
-        leaderConfig.TorqueCurrent.PeakReverseTorqueCurrent = -65;
-
-        leaderConfig.ClosedLoopRamps.TorqueClosedLoopRampPeriod = 0.12;
-
         leaderConfig.Slot0.kP = 20;
         leaderConfig.Slot0.kD = 0.2;
         leaderConfig.Slot0.kG = 0.15;
 
         leaderConfig.MotionMagic.MotionMagicCruiseVelocity = 25;
         leaderConfig.MotionMagic.MotionMagicAcceleration = 40;
-        leaderConfig.MotionMagic.MotionMagicJerk = 180;
 
         double extended =
             (DEFAULT_EXTEND_DEGREES / 360.0) * GEAR_RATIO;
@@ -94,9 +87,6 @@ public class Intake extends SubsystemBase {
         TalonFXConfiguration followerConfig = new TalonFXConfiguration();
 
         followerConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
-        followerConfig.CurrentLimits = leaderConfig.CurrentLimits;
-        followerConfig.TorqueCurrent = leaderConfig.TorqueCurrent;
-        followerConfig.ClosedLoopRamps = leaderConfig.ClosedLoopRamps;
         followerConfig.Slot0 = leaderConfig.Slot0;
         followerConfig.MotionMagic = leaderConfig.MotionMagic;
 
@@ -107,12 +97,6 @@ public class Intake extends SubsystemBase {
 
         intakeConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
 
-        intakeConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        intakeConfig.CurrentLimits.SupplyCurrentLimit = 80;
-
-        intakeConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-        intakeConfig.CurrentLimits.StatorCurrentLimit = 120;
-
         intakeConfig.Slot0.kP = 0.12;
         intakeConfig.Slot0.kV = 0.12;
 
@@ -121,12 +105,6 @@ public class Intake extends SubsystemBase {
         TalonFXConfiguration assistConfig = new TalonFXConfiguration();
 
         assistConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
-
-        assistConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        assistConfig.CurrentLimits.SupplyCurrentLimit = 60;
-
-        assistConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-        assistConfig.CurrentLimits.StatorCurrentLimit = 100;
 
         assistMotor.getConfigurator().apply(assistConfig);
 
@@ -176,7 +154,6 @@ public class Intake extends SubsystemBase {
     }
 
     public void retract() {
-
         state = IntakeState.RETRACTING;
         toggleExtended = false;
     }
@@ -231,21 +208,6 @@ public class Intake extends SubsystemBase {
         return extensionLeader
             .getPosition()
             .getValueAsDouble() <= 0.05;
-    }
-
-    public void goToPushback() {
-
-        double pushbackDegrees =
-            SmartDashboard.getNumber("Intake Pushback Degrees", 75.0);
-
-        double PUSHBACK =
-            (pushbackDegrees / 360.0) * GEAR_RATIO;
-
-        setArmPosition(PUSHBACK);
-        runIntake();
-
-        state = IntakeState.EXTENDED;
-        toggleExtended = false;
     }
 
     @Override

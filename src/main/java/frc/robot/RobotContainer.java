@@ -26,9 +26,7 @@ import com.pathplanner.lib.auto.NamedCommands;
 
 public class RobotContainer {
 
-    //----------------------------
     // Subsystems
-    //----------------------------
     private final Feeder feeder = new Feeder();
     private final Intake intake = new Intake(feeder);
     private final Shooter shooter = new Shooter(feeder);
@@ -37,9 +35,7 @@ public class RobotContainer {
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
 
-    //----------------------------
     // Drive config
-    //----------------------------
     private double MaxSpeed = 1.0 * TunerConstants.kSpeedAt12Volts.in(MetersPerSecond);
     private double MaxAngularRate = RotationsPerSecond.of(0.75).in(RadiansPerSecond);
 
@@ -53,69 +49,43 @@ public class RobotContainer {
 
     private final Telemetry logger = new Telemetry(MaxSpeed);
 
-    //----------------------------
     // Controllers
-    //----------------------------
     private final CommandXboxController driverXboxController = new CommandXboxController(0);
     private final CommandXboxController operatorXboxController = new CommandXboxController(1);
 
     public RobotContainer() {
 
-        //--------------------------------
-        // PATHPLANNER NAMED COMMANDS (AUTO)
-        //--------------------------------
-        // These names MUST match your event markers in PathPlanner
-        // Example markers: "Intake", "Shoot"
-
+        // Named commands for auto
         NamedCommands.registerCommand(
             "Intake Pushback Position",
-            Commands.runOnce(
-                () -> intake.goToPushback(),
-                intake
-            )
+            Commands.runOnce(() -> intake.toggleExtendPushback(), intake)
         );
 
         NamedCommands.registerCommand(
             "Shoot",
             Commands.sequence(
-
-                // Set shooter speed FIRST
                 Commands.runOnce(() -> shooter.setSpeed(50), shooter),
-
-                // Then spin shooter
                 Commands.runOnce(() -> shooter.spinShooter(), shooter),
-
-                // Wait for spin-up
                 Commands.waitSeconds(1.5),
-
-                // Feed
                 Commands.runEnd(
                     () -> feeder.runFeeder(),
                     () -> feeder.stopFeeder(),
                     feeder
                 ).withTimeout(10.0),
-
-                // Stop shooter
                 Commands.runOnce(() -> shooter.stopShooter(), shooter)
             )
         );
-        //--------------------------------
-        // AUTO CHOOSER (SELECT AUTOS ON DASHBOARD)
-        //--------------------------------
-        // Autos are created in PathPlanner as ".auto" files
-        // They appear here automatically
 
+        // Auto chooser
         autoChooser = AutoBuilder.buildAutoChooser();
         SmartDashboard.putData("Auto Chooser", autoChooser);
 
-        //--------------------------------
-        // CONTROLLER BINDINGS
-        //--------------------------------
         configureBindings();
     }
 
     private void configureBindings() {
 
+        // ✅ STABLE DRIVE (NO TWITCH)
         drivetrain.setDefaultCommand(
             drivetrain.applyRequest(() -> {
 
@@ -123,52 +93,24 @@ public class RobotContainer {
                 double rawX = -driverXboxController.getLeftX();
                 double rawRot = -driverXboxController.getRightX();
 
-                double squaredY = Math.copySign(rawY * rawY, rawY);
-                double squaredX = Math.copySign(rawX * rawX, rawX);
-                double squaredRot = Math.copySign(rawRot * rawRot, rawRot);
+                // Deadband
+                if (Math.abs(rawY) < 0.15) rawY = 0;
+                if (Math.abs(rawX) < 0.15) rawX = 0;
+                if (Math.abs(rawRot) < 0.15) rawRot = 0;
 
-                double speedMultiplier =
-                    driverXboxController.getLeftTriggerAxis() > 0.5 ? 0.5 : 1.0;
-
-                //--------------------------------
-                // LIMELIGHT AUTO AIM
-                //--------------------------------
-                double rot;
-
-                boolean autoAim =
-                    driverXboxController.getLeftTriggerAxis() > 0.5;
-
-                if (autoAim && limelight.hasTarget()) {
-
-                    double tx = limelight.getTX();
-                    double kP = 0.02;
-
-                    if (Math.abs(tx) < 1.0)
-                        rot = 0;
-                    else
-                        rot = tx * kP;
-
-                    double distance = limelight.getDistanceMeters();
-                    double speed = shooter.getSpeedForDistance(distance);
-
-                    shooter.setSpeed(speed);
-
-                } else {
-
-                    rot = squaredRot * MaxAngularRate;
-
+                // 🔑 Critical fix: true zero = Idle
+                if (rawY == 0 && rawX == 0 && rawRot == 0) {
+                    return new SwerveRequest.Idle();
                 }
 
                 return drive
-                    .withVelocityX(squaredY * MaxSpeed * speedMultiplier)
-                    .withVelocityY(squaredX * MaxSpeed * speedMultiplier)
-                    .withRotationalRate(rot * speedMultiplier);
+                    .withVelocityX(rawY * MaxSpeed)
+                    .withVelocityY(rawX * MaxSpeed)
+                    .withRotationalRate(rawRot * MaxAngularRate);
             })
         );
 
-        //----------------------------
         // Idle while disabled
-        //----------------------------
         final var idle = new SwerveRequest.Idle();
 
         RobotModeTriggers.disabled().whileTrue(
@@ -188,9 +130,7 @@ public class RobotContainer {
             )
         );
 
-        //----------------------------
-        // SysId routines
-        //----------------------------
+        // SysId
         driverXboxController.back().and(driverXboxController.y())
             .whileTrue(drivetrain.sysIdDynamic(Direction.kForward));
 
@@ -203,17 +143,13 @@ public class RobotContainer {
         driverXboxController.start().and(driverXboxController.x())
             .whileTrue(drivetrain.sysIdQuasistatic(Direction.kReverse));
 
-        //----------------------------
         // Reset heading
-        //----------------------------
         driverXboxController.back().and(driverXboxController.start())
             .onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
 
         drivetrain.registerTelemetry(logger::telemeterize);
 
-        //----------------------------
-        // Shooter test spin
-        //----------------------------
+        // Shooter test
         driverXboxController.y()
             .whileTrue(
                 shooter.runEnd(
@@ -222,9 +158,7 @@ public class RobotContainer {
                 )
             );
 
-        //----------------------------
-        // Shooter + Feeder
-        //----------------------------
+        // Shooter + feeder
         driverXboxController.rightTrigger(.3)
             .whileTrue(
                 Commands.runEnd(
@@ -241,9 +175,7 @@ public class RobotContainer {
                 )
             );
 
-        //----------------------------
-        // Intake Controls
-        //----------------------------
+        // Intake
         driverXboxController.rightBumper()
             .debounce(0.25)
             .onTrue(intake.runOnce(intake::toggleExtendPushback));
@@ -252,9 +184,7 @@ public class RobotContainer {
             .debounce(0.25)
             .onTrue(intake.runOnce(intake::retract));
 
-        //----------------------------
-        // Operator Feeder Test
-        //----------------------------
+        // Operator feeder
         operatorXboxController.x()
             .whileTrue(
                 feeder.runEnd(
@@ -267,28 +197,21 @@ public class RobotContainer {
     public void periodic() {
 
         SmartDashboard.putNumber("Operator LT", operatorXboxController.getLeftTriggerAxis());
+        SmartDashboard.putNumber("Driver Right Trigger", driverXboxController.getRightTriggerAxis());
 
-        SmartDashboard.putNumber(
-            "Driver Right Trigger",
-            driverXboxController.getRightTriggerAxis()
-        );
-
+        // Limelight data
         SmartDashboard.putNumber("Limelight TX", limelight.getTX());
         SmartDashboard.putNumber("Limelight Distance", limelight.getDistanceMeters());
         SmartDashboard.putBoolean("Limelight Has Target", limelight.hasTarget());
 
-        SmartDashboard.putNumber("Robot X", drivetrain.getState().Pose.getX());
-        SmartDashboard.putNumber("Robot Y", drivetrain.getState().Pose.getY());
+        // ✅ Vision-corrected pose
+        SmartDashboard.putNumber("Robot X", drivetrain.getPose().getX());
+        SmartDashboard.putNumber("Robot Y", drivetrain.getPose().getY());
         SmartDashboard.putNumber("Robot Heading",
-            drivetrain.getState().Pose.getRotation().getDegrees());
+            drivetrain.getPose().getRotation().getDegrees());
     }
 
-    //--------------------------------
-    // Autonomous
-    //--------------------------------
     public Command getAutonomousCommand() {
-
         return autoChooser.getSelected();
     }
-    // branch bills-dev
 }
