@@ -17,10 +17,12 @@ import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 
 import edu.wpi.first.math.Matrix;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
-import edu.wpi.first.networktables.NetworkTableInstance;
+
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.Notifier;
@@ -32,12 +34,6 @@ import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 
 import frc.robot.generated.TunerConstants.TunerSwerveDrivetrain;
 
-// limelight libraries
-import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.wpilibj.Timer;
-
 public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Subsystem {
 
     private static final double kSimLoopPeriod = 0.004;
@@ -48,7 +44,6 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     private static final Rotation2d kRedAlliancePerspectiveRotation = Rotation2d.k180deg;
 
     private boolean m_hasAppliedOperatorPerspective = false;
-    private SwerveDrivePoseEstimator poseEstimator;
 
     private final SwerveRequest.SysIdSwerveTranslation m_translationCharacterization =
         new SwerveRequest.SysIdSwerveTranslation();
@@ -127,7 +122,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
             RobotConfig config = RobotConfig.fromGUISettings();
 
             AutoBuilder.configure(
-                () -> this.getPose(),
+                () -> this.getState().Pose,
                 this::resetPose,
                 () -> this.getState().Speeds,
                 (ChassisSpeeds speeds) ->
@@ -149,13 +144,6 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
                 e.getStackTrace()
             );
         }
-
-        poseEstimator = new SwerveDrivePoseEstimator(
-            this.getKinematics(),
-            this.getState().Pose.getRotation(),
-            this.getState().ModulePositions,
-            this.getState().Pose
-        );
     }
 
     public Command applyRequest(Supplier<SwerveRequest> request) {
@@ -182,30 +170,6 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
                 );
                 m_hasAppliedOperatorPerspective = true;
             });
-        }
-        // --- POSE ESTIMATOR UPDATE ---
-        poseEstimator.update(
-            this.getState().Pose.getRotation(),
-            this.getState().ModulePositions
-        );
-
-        // --- LIMELIGHT VISION ---
-        var table = NetworkTableInstance.getDefault().getTable("limelight");
-        double tv = table.getEntry("tv").getDouble(0);
-
-        if (tv == 1) {
-            double[] botpose = table.getEntry("botpose_wpiblue").getDoubleArray(new double[7]);
-
-            if (botpose.length >= 7) {
-                poseEstimator.addVisionMeasurement(
-                    new Pose2d(
-                        botpose[0],
-                        botpose[1],
-                        Rotation2d.fromDegrees(botpose[5])
-                    ),
-                    Timer.getFPGATimestamp() - (botpose[6] / 1000.0)
-                );
-            }
         }
     }
 
@@ -245,10 +209,6 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
             Utils.fpgaToCurrentTime(timestampSeconds),
             visionMeasurementStdDevs
         );
-    }
-
-    public Pose2d getPose() {
-    return poseEstimator.getEstimatedPosition();
     }
 
     @Override

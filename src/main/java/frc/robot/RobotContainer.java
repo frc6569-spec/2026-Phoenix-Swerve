@@ -21,7 +21,6 @@ import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.Feeder;
 import frc.robot.subsystems.Intake;
 import frc.robot.subsystems.Shooter;
-import frc.robot.subsystems.Limelight;
 import com.pathplanner.lib.auto.NamedCommands;
 
 public class RobotContainer {
@@ -30,7 +29,6 @@ public class RobotContainer {
     private final Feeder feeder = new Feeder();
     private final Intake intake = new Intake(feeder);
     private final Shooter shooter = new Shooter(feeder);
-    private final Limelight limelight = new Limelight();
     private final SendableChooser<Command> autoChooser;
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
@@ -85,23 +83,13 @@ public class RobotContainer {
 
     private void configureBindings() {
 
-        // ✅ STABLE DRIVE (NO TWITCH)
+        // ✅ SIMPLE ORIGINAL DRIVE (no deadband hacks, no idle override)
         drivetrain.setDefaultCommand(
             drivetrain.applyRequest(() -> {
 
                 double rawY = -driverXboxController.getLeftY();
                 double rawX = -driverXboxController.getLeftX();
                 double rawRot = -driverXboxController.getRightX();
-
-                // Deadband
-                if (Math.abs(rawY) < 0.15) rawY = 0;
-                if (Math.abs(rawX) < 0.15) rawX = 0;
-                if (Math.abs(rawRot) < 0.15) rawRot = 0;
-
-                // 🔑 Critical fix: true zero = Idle
-                if (rawY == 0 && rawX == 0 && rawRot == 0) {
-                    return new SwerveRequest.Idle();
-                }
 
                 return drive
                     .withVelocityX(rawY * MaxSpeed)
@@ -199,16 +187,7 @@ public class RobotContainer {
         SmartDashboard.putNumber("Operator LT", operatorXboxController.getLeftTriggerAxis());
         SmartDashboard.putNumber("Driver Right Trigger", driverXboxController.getRightTriggerAxis());
 
-        // Limelight data
-        SmartDashboard.putNumber("Limelight TX", limelight.getTX());
-        SmartDashboard.putNumber("Limelight Distance", limelight.getDistanceMeters());
-        SmartDashboard.putBoolean("Limelight Has Target", limelight.hasTarget());
-
-        // ✅ Vision-corrected pose
-        SmartDashboard.putNumber("Robot X", drivetrain.getPose().getX());
-        SmartDashboard.putNumber("Robot Y", drivetrain.getPose().getY());
-        SmartDashboard.putNumber("Robot Heading",
-            drivetrain.getPose().getRotation().getDegrees());
+        // 🔥 NO LIMELIGHT, NO POSE ESTIMATOR OUTPUT
     }
 
     public Command getAutonomousCommand() {
