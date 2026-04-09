@@ -2,6 +2,7 @@ package frc.robot.subsystems;
 
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
+import frc.robot.utils.LimelightHelpers;
 
 public class Limelight {
 
@@ -21,7 +22,9 @@ public class Limelight {
     }
 
     public double getDistanceMeters() {
-        return table.getEntry("botpose_targetspace")
-            .getDoubleArray(new double[6])[2] * -1;
+        return LimelightHelpers
+            .getTargetPose3d_RobotSpace("limelight")
+            .getTranslation()
+            .getNorm();
     }
-}
+}   

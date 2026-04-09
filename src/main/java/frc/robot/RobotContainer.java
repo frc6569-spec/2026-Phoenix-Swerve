@@ -6,6 +6,8 @@ import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 import edu.wpi.first.wpilibj2.command.Command;
@@ -20,12 +22,10 @@ import frc.robot.subsystems.Feeder;
 import frc.robot.subsystems.Intake;
 import frc.robot.subsystems.Shooter;
 import frc.robot.subsystems.Limelight;
+import frc.robot.utils.LimelightHelpers;
 
 public class RobotContainer {
 
-    //----------------------------
-    // Subsystems
-    //----------------------------
     private final Feeder feeder = new Feeder();
     private final Intake intake = new Intake(feeder);
     private final Shooter shooter = new Shooter(feeder);
@@ -33,9 +33,6 @@ public class RobotContainer {
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
 
-    //----------------------------
-    // Drive config
-    //----------------------------
     private double MaxSpeed = 1.0 * TunerConstants.kSpeedAt12Volts.in(MetersPerSecond);
     private double MaxAngularRate = RotationsPerSecond.of(0.75).in(RadiansPerSecond);
 
@@ -49,14 +46,27 @@ public class RobotContainer {
 
     private final Telemetry logger = new Telemetry(MaxSpeed);
 
-    //----------------------------
-    // Controllers
-    //----------------------------
     private final CommandXboxController driverXboxController = new CommandXboxController(0);
     private final CommandXboxController operatorXboxController = new CommandXboxController(1);
 
     public RobotContainer() {
+
+        // Tag filter (safe Optional handling)
+        var alliance = DriverStation.getAlliance();
+        if (alliance.isPresent() && alliance.get() == Alliance.Blue) {
+            LimelightHelpers.SetFiducialIDFiltersOverride(
+                "limelight",
+                new int[]{21,24,25,26,18,27}
+            );
+        } else {
+            LimelightHelpers.SetFiducialIDFiltersOverride(
+                "limelight",
+                new int[]{5,8,9,10,11,12}
+            );
+        }
+
         configureBindings();
+
     }
 
     private void configureBindings() {
@@ -75,9 +85,6 @@ public class RobotContainer {
                 double speedMultiplier =
                     driverXboxController.getLeftTriggerAxis() > 0.5 ? 0.5 : 1.0;
 
-                //--------------------------------
-                // LIMELIGHT AUTO AIM
-                //--------------------------------
                 double rot;
 
                 boolean autoAim =
@@ -86,17 +93,12 @@ public class RobotContainer {
                 if (autoAim && limelight.hasTarget()) {
 
                     double tx = limelight.getTX();
-                    double kP = 0.02;
+                    double kP = 0.03;
 
                     if (Math.abs(tx) < 1.0)
                         rot = 0;
                     else
-                        rot = tx * kP;
-
-                    double distance = limelight.getDistanceMeters();
-                    double speed = shooter.getSpeedForDistance(distance);
-
-                    shooter.setSpeed(speed);
+                        rot = -tx * kP * MaxAngularRate;
 
                 } else {
 
@@ -111,9 +113,6 @@ public class RobotContainer {
             })
         );
 
-        //----------------------------
-        // Idle while disabled
-        //----------------------------
         final var idle = new SwerveRequest.Idle();
 
         RobotModeTriggers.disabled().whileTrue(
@@ -133,9 +132,7 @@ public class RobotContainer {
             )
         );
 
-        //----------------------------
-        // SysId routines
-        //----------------------------
+        // SysId
         driverXboxController.back().and(driverXboxController.y())
             .whileTrue(drivetrain.sysIdDynamic(Direction.kForward));
 
@@ -148,17 +145,14 @@ public class RobotContainer {
         driverXboxController.start().and(driverXboxController.x())
             .whileTrue(drivetrain.sysIdQuasistatic(Direction.kReverse));
 
-        //----------------------------
         // Reset heading
-        //----------------------------
         driverXboxController.back().and(driverXboxController.start())
             .onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
 
         drivetrain.registerTelemetry(logger::telemeterize);
 
-        //----------------------------
-        // Shooter test spin
-        //----------------------------
+        ////////////////////////////////////////////////////////
+        // Shooter test
         driverXboxController.y()
             .whileTrue(
                 shooter.runEnd(
@@ -167,9 +161,7 @@ public class RobotContainer {
                 )
             );
 
-        //----------------------------
-        // Shooter + Feeder
-        //----------------------------
+        // Shooter + feeder
         driverXboxController.rightTrigger(.3)
             .whileTrue(
                 Commands.runEnd(
@@ -186,20 +178,21 @@ public class RobotContainer {
                 )
             );
 
-        //----------------------------
-        // Intake Controls
-        //----------------------------
+        // Intake (Driver)
         driverXboxController.rightBumper()
-            .debounce(0.25)
+            .debounce(0.1)
+            .onTrue(intake.runOnce(intake::toggleExtendPushback));
+
+        // Intake (Operator) ✅ NEW
+        operatorXboxController.rightBumper()
+            .debounce(0.1)
             .onTrue(intake.runOnce(intake::toggleExtendPushback));
 
         driverXboxController.leftBumper()
             .debounce(0.25)
             .onTrue(intake.runOnce(intake::retract));
 
-        //----------------------------
-        // Operator Feeder Test
-        //----------------------------
+        // Operator feeder
         operatorXboxController.x()
             .whileTrue(
                 feeder.runEnd(
@@ -210,30 +203,12 @@ public class RobotContainer {
     }
 
     public void periodic() {
-
-        SmartDashboard.putNumber("Operator LT", operatorXboxController.getLeftTriggerAxis());
-
-        SmartDashboard.putNumber(
-            "Driver Right Trigger",
-            driverXboxController.getRightTriggerAxis()
-        );
-
         SmartDashboard.putNumber("Limelight TX", limelight.getTX());
-        SmartDashboard.putNumber("Limelight Distance", limelight.getDistanceMeters());
         SmartDashboard.putBoolean("Limelight Has Target", limelight.hasTarget());
-
-        SmartDashboard.putNumber("Robot X", drivetrain.getState().Pose.getX());
-        SmartDashboard.putNumber("Robot Y", drivetrain.getState().Pose.getY());
-        SmartDashboard.putNumber("Robot Heading",
-            drivetrain.getState().Pose.getRotation().getDegrees());
+        SmartDashboard.putNumber("LL Distance", limelight.getDistanceMeters());
     }
 
-    //--------------------------------
-    // Autonomous
-    //--------------------------------
     public Command getAutonomousCommand() {
-
-        return Commands.none(); // No auto yet
+        return Commands.none();
     }
-    // branch bills-dev
 }

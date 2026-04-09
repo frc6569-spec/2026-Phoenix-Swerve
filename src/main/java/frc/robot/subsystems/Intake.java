@@ -32,16 +32,8 @@ public class Intake extends SubsystemBase {
 
     private boolean toggleExtended = false;
 
-    private static final double COLLISION_CURRENT = 80;
-    private static final double COLLISION_RETRACT_DEGREES = 10;
-
-    private static final double COLLISION_RETRACT_ROTATIONS =
-        (COLLISION_RETRACT_DEGREES / 360.0) * GEAR_RATIO;
-
-    private static final int COLLISION_COOLDOWN_LOOPS = 50;
-
-    private int collisionCooldown = 0;
-    private boolean collisionActive = false;
+    // ✅ NEW: intake control flag
+    private boolean intakeEnabled = false;
 
     private double leaderTarget = 0;
 
@@ -143,7 +135,7 @@ public class Intake extends SubsystemBase {
         assistMotor.getConfigurator().apply(assistConfig);
 
         SmartDashboard.putNumber("Intake Roller Speed", 1.0);
-        SmartDashboard.putNumber("Intake Target Velocity", 95);
+        SmartDashboard.putNumber("Intake Target Velocity", 110);
         SmartDashboard.putNumber("Intake Assist Speed", 0.15);
 
         SmartDashboard.putNumber("Intake Extend Degrees", DEFAULT_EXTEND_DEGREES);
@@ -182,12 +174,13 @@ public class Intake extends SubsystemBase {
             state = IntakeState.EXTENDING;
             toggleExtended = true;
 
+            intakeEnabled = true;   // ✅ intake ON
+
         } else {
 
             setArmPosition(PUSHBACK);
 
-            runIntake();
-            feeder.setIntakeActive(true);
+            intakeEnabled = false;  // ✅ intake OFF
 
             toggleExtended = false;
         }
@@ -196,6 +189,7 @@ public class Intake extends SubsystemBase {
     public void retract() {
         state = IntakeState.RETRACTING;
         toggleExtended = false;
+        intakeEnabled = false;
     }
 
     private void runAssist() {
@@ -209,7 +203,6 @@ public class Intake extends SubsystemBase {
     }
 
     private void stopAssist() {
-
         assistMotor.setControl(
             assistRequest.withOutput(0)
         );
@@ -240,17 +233,11 @@ public class Intake extends SubsystemBase {
     }
 
     private boolean isExtended(double extended) {
-
-        return extensionLeader
-            .getPosition()
-            .getValueAsDouble() >= extended * 0.95;
+        return extensionLeader.getPosition().getValueAsDouble() >= extended * 0.95;
     }
 
     private boolean isRetracted() {
-
-        return extensionLeader
-            .getPosition()
-            .getValueAsDouble() <= 0.05;
+        return extensionLeader.getPosition().getValueAsDouble() <= 0.05;
     }
 
     @Override
@@ -269,18 +256,12 @@ public class Intake extends SubsystemBase {
                 setArmPosition(EXTENDED);
 
                 if (isExtended(EXTENDED)) {
-
-                    runIntake();
-                    feeder.setIntakeActive(true);
                     state = IntakeState.EXTENDED;
                 }
 
             break;
 
             case RETRACTING:
-
-                stopIntake();
-                feeder.setIntakeActive(false);
 
                 setArmPosition(RETRACTED);
 
@@ -291,14 +272,26 @@ public class Intake extends SubsystemBase {
             break;
 
             case EXTENDED:
-
-                runIntake();
-                feeder.setIntakeActive(true);
-
             break;
 
             case RETRACTED:
             break;
+        }
+
+        if (intakeEnabled) {
+            runIntake();
+            feeder.setIntakeActive(true);
+        } else {
+            stopIntake();
+            feeder.setIntakeActive(false);
+        }
+
+        // ✅ NEW: assist follows feeder ALSO
+        if (feeder.isRunning()) {
+            runAssist();
+        } else if (!intakeEnabled) {
+            // only stop if intake isn't already using it
+            stopAssist();
         }
     }
 }

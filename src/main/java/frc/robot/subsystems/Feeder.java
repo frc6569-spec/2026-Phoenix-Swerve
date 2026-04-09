@@ -69,6 +69,10 @@ public class Feeder extends SubsystemBase {
         }
     }
 
+    public boolean isRunning() {
+        return overrideActive || intakeActive;
+    }
+
     private void pulseLogic() {
 
         double t = pulseTimer.get();
